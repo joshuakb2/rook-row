@@ -1,0 +1,61 @@
+_rook-row()
+{
+    COMPREPLY=()
+
+    local cur prev words cword
+    _init_completion -n = || return
+
+    key() {
+        COMPREPLY=( $(compgen -W $1 -S = -- "$cur") )
+        compopt -o nospace
+    }
+
+    values() {
+        COMPREPLY=( $(compgen -W "$*" -- "$cur") )
+    }
+
+    persons='bill deborah josh chris'
+
+    case $cur in
+        partner=*)
+            cur=${cur#*=}
+            values bill deborah chris
+            return
+            ;;
+        deal=*)
+            cur=${cur#*=}
+            values $persons
+            return
+            ;;
+        nest=*)
+            cur=${cur#*=}
+            values $persons
+            return
+            ;;
+        bid=*)
+            cur=${cur#*=}
+            values {70..120..5}
+            return
+            ;;
+        josh_score=*)
+            cur=${cur#*=}
+            values {0..120..5}
+            return
+            ;;
+        rook=*)
+            cur=${cur#*=}
+            values $persons
+            return
+            ;;        
+    esac
+
+    case $cword in
+        1) key partner;;
+        2) key deal;;
+        3) key nest;;
+        4) key bid;;
+        5) key rook;;
+        6) key josh_score;;
+    esac
+}
+complete -F _rook-row rook-row

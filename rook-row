@@ -1,0 +1,173 @@
+#!/usr/bin/env bash
+
+help() {
+    echo 'Usage:'
+    echo '  rook_row'
+    echo '    partner=<chris|bill|deborah>'
+    echo '    deal=<bill|deborah|josh|chris>'
+    echo '    nest=<bill|deborah|josh|chris>'
+    echo '    bid=<number>'
+    echo '    josh_score=<number>'
+    echo '    rook=<bill|deborah|josh|chris>'
+    echo
+    echo 'Copies to the clipboard the text that needs to be entered into the appropriate rook scoresheet.'
+    echo
+}
+
+kv_pair() {
+    if [[ $1 =~ ^(.+)=(.+)$ ]]; then
+        declare -g key="${BASH_REMATCH[1]}"
+        declare -g value="${BASH_REMATCH[2]}"
+    else
+        return 1
+    fi
+}
+
+get_person() {
+    var=$1
+    x=$2
+
+    case $x in
+        josh|chris|deborah|bill)
+            declare -g "$var"="$x"
+            ;;
+        *)
+            echo >&2 "Invalid person for \"$var\" \"$x\""
+            exit 1
+            ;;
+    esac
+}
+
+get_number() {
+    var=$1
+    min=$2
+    max=$3
+    x=$4
+
+    if ! [[ $x =~ ^[0-9]+$ ]]; then
+        echo >&2 "Invalid number for \"$var\" \"$x\""
+        exit 1
+    fi
+
+    if (( x % 5 != 0 || x < min || x > max )); then
+        echo >&2 "Invalid number for \"$var\" $x"
+        exit 1
+    fi
+
+    declare -g "$var"="$x"
+}
+
+date=$(date --date=@$(( $(date +%s) - 6 * 60 * 60 )) +%D)
+
+while (( $# > 0 )); do
+    if ! kv_pair "$1"; then
+        echo >&2 "Invalid arg: \"$1\""
+        exit 1
+    fi
+
+    case $key in
+        partner)
+            case $value in
+                chris|bill|deborah)
+                    partner=$value
+                    ;;
+                *)
+                    echo >&2 "Invalid partner \"$value\""
+                    exit 1
+                    ;;
+            esac
+            ;;
+        deal)
+            get_person deal "$value";;
+        nest)
+            get_person nest "$value";;
+        bid)
+            get_number bid 70 120 "$value";;
+        josh_score)
+            get_number josh_score 0 120 "$value";;
+        rook)
+            get_person rook "$value";;
+        *)
+            echo >&2 "Unrecognized flag \"$key\""
+            exit 1
+            ;;
+    esac
+
+    shift
+done
+
+for var in partner deal nest bid josh_score rook; do
+    if [[ ! ${!var} ]]; then
+        echo >&2 "Variable \"$var\" unset!"
+        bad=yes
+    fi
+done
+
+if [[ $bad ]]; then
+    exit 1
+fi
+
+name() {
+    case $1 in
+        josh) echo Josh;;
+        chris) echo Chris;;
+        deborah) echo Deborah;;
+        bill) echo Bill;;
+    esac
+}
+
+on_josh_team() {
+    [[ $1 == josh || $1 == $partner ]]
+}
+
+if on_josh_team $nest; then
+    if (( josh_score >= bid )); then
+        josh_real_score=$josh_score
+    else
+        josh_real_score=$((-bid))
+    fi
+
+    other_real_score=$((120 - josh_score))
+else
+    josh_real_score=$josh_score
+
+    if (( (120 - josh_score) >= bid )); then
+        other_real_score=$((120 - josh_score))
+    else
+        other_real_score=$((-bid))
+    fi
+fi
+
+cells=()
+
+# My partner
+cells+=( $(name $partner) )
+
+# Whose deal
+cells+=( $(name $deal) )
+
+# Who gets the nest
+cells+=( $(name $nest) )
+
+# Bid amount
+cells+=( $bid )
+
+# Josh team real score
+cells+=( $josh_real_score )
+
+# Other team real score
+cells+=( $other_real_score )
+
+# Who had the rook
+cells+=( $(name $rook) )
+
+# Date of game
+cells+=( $date )
+
+output=${cells[0]}
+
+for (( i=1; i < ${#cells[@]}; i++)); do
+    output="$output"$'\t'"${cells[$i]}"
+done
+
+copy <<<"$output"
